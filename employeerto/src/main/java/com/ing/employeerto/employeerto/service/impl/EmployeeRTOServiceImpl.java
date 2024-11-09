@@ -17,8 +17,7 @@ import util.DaysUtil;
 
 import java.util.Optional;
 
-import static com.ing.employeerto.employeerto.common.EmployeeCommon.DAY_IS_INVALID;
-import static com.ing.employeerto.employeerto.common.EmployeeCommon.EMPLOYEE_ALREADY_EXISTS;
+import static com.ing.employeerto.employeerto.common.EmployeeCommon.*;
 
 @Slf4j
 @Service
@@ -33,6 +32,7 @@ public class EmployeeRTOServiceImpl implements EmployeeRTOService {
         if (employee.isPresent()) {
             throw new EmployeeException(HttpStatus.BAD_REQUEST.toString(), EMPLOYEE_ALREADY_EXISTS);
         } else {
+
             return employeeRepository.save(EmployeeEntity.builder()
                 .team(employeeRequest.getEmployeeTeam())
                 .name(employeeRequest.getEmployeeName())
@@ -42,9 +42,7 @@ public class EmployeeRTOServiceImpl implements EmployeeRTOService {
 
     @Override
     public ScheduleEntity plotSchedule(ScheduleRequest scheduleRequest) {
-        if (scheduleRepository.existsById(scheduleRequest.getEmployeeId())) {
-            throw new EmployeeException(HttpStatus.BAD_REQUEST.toString(), EMPLOYEE_ALREADY_EXISTS);
-        } else {
+        if (employeeRepository.existsById(scheduleRequest.getEmployeeId())) {
             EmployeeEntity employee =
                 employeeRepository.findById(scheduleRequest.getEmployeeId())
                     .orElseThrow(() -> new EmployeeException(HttpStatus.BAD_REQUEST.toString(), EMPLOYEE_ALREADY_EXISTS));
@@ -52,12 +50,28 @@ public class EmployeeRTOServiceImpl implements EmployeeRTOService {
             validateDay(scheduleRequest.getFirstDay());
             validateDay(scheduleRequest.getSecondDay());
 
+            return plotSchedule(employee, scheduleRequest);
+        } else {
+            throw new EmployeeException(HttpStatus.BAD_REQUEST.toString(), EMPLOYEE_DOES_NOT_EXISTS);
+        }
+    }
+
+    private ScheduleEntity plotSchedule(EmployeeEntity employee, ScheduleRequest scheduleRequest) {
+        Optional<ScheduleEntity> existingSchedule =
+            scheduleRepository.findByEmployeeId(employee.getId());
+
+        if (existingSchedule.isPresent()) {
+            existingSchedule.get().setFirstDay(scheduleRequest.getFirstDay());
+            existingSchedule.get().setSecondDay(scheduleRequest.getSecondDay());
+            return scheduleRepository.save(existingSchedule.get());
+        } else {
             return scheduleRepository.save(ScheduleEntity.builder()
                 .employee(employee)
                 .firstDay(scheduleRequest.getFirstDay())
                 .secondDay(scheduleRequest.getSecondDay())
                 .build());
         }
+
     }
 
     private void validateDay(String day) {
